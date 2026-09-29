@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Голосование — Одномандатный избирательный округ №1</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'PT Sans', 'Segoe UI', Arial, sans-serif;
+            background: #f2f4f7;
+            color: #1c1c1c;
+            font-size: 15px;
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .top-bar {
+            background: #0d4cd3;
+            color: #fff;
+            font-size: 13px;
+            padding: 6px 0;
+            border-bottom: 3px solid #ffcc00;
+        }
+        .top-bar__inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+        .top-bar__flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+        .top-bar__flag::before {
+            content: "";
+            display: inline-block;
+            width: 22px;
+            height: 15px;
+            background: linear-gradient(to bottom, #fff 33.3%, #0d4cd3 33.3%, #0d4cd3 66.6%, #d52b1e 66.6%);
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+        .top-bar__links a {
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.9;
+            margin-left: 18px;
+        }
+        .top-bar__links a:hover { text-decoration: underline; opacity: 1; }
+
+        .site-header { background: #fff; border-bottom: 1px solid #dfe3e8; }
+        .site-header__inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .emblem {
+            width: 56px; height: 56px; flex-shrink: 0;
+            background: #0d4cd3; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 22px;
+            border: 2px solid #ffcc00;
+        }
+        .site-title h1 { font-size: 19px; font-weight: 700; color: #0d2c6b; }
+        .site-title p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+        .breadcrumbs {
+            max-width: 1200px; margin: 0 auto;
+            padding: 14px 24px 0;
+            font-size: 13px; color: #6b7280;
+        }
+        .breadcrumbs a { color: #0d4cd3; text-decoration: none; }
+        .breadcrumbs a:hover { text-decoration: underline; }
+        .breadcrumbs span { margin: 0 6px; color: #b0b6bf; }
+
+        .main {
+            flex: 1;
+            max-width: 1200px; width: 100%;
+            margin: 0 auto; padding: 24px;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px; align-items: start;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+        }
+        .card__header {
+            padding: 18px 22px;
+            border-bottom: 1px solid #e7eaee;
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+            flex-wrap: wrap;
+        }
+        .card__header h2 { font-size: 18px; color: #0d2c6b; font-weight: 700; }
+        .card__header p { font-size: 13px; color: #6b7280; margin-top: 4px; }
+        .card__body { padding: 22px; }
+
+        .info-strip {
+            background: #eef4ff; border-left: 4px solid #0d4cd3;
+            padding: 14px 18px; border-radius: 4px;
+            font-size: 14px; color: #17356e;
+            margin-bottom: 20px;
+        }
+        .info-strip strong { color: #0d2c6b; }
+
+        .success-box {
+            display: none;
+            background: #ecfdf3;
+            border: 1px solid #a6e5b8;
+            border-left: 4px solid #128a3a;
+            color: #0f5132;
+            padding: 14px 18px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .success-box.show { display: block; }
+        .success-box strong { display: block; margin-bottom: 2px; font-size: 15px; }
+
+        .candidates-list { display: flex; flex-direction: column; gap: 12px; }
+        .candidate {
+            border: 1px solid #dfe3e8; border-radius: 6px;
+            padding: 16px 18px;
+            display: flex; gap: 16px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            background: #fff;
+            position: relative;
+        }
+        .candidate:hover { border-color: #0d4cd3; background: #fafbff; }
+        .candidate.selected {
+            border-color: #0d4cd3; background: #eef4ff;
+            box-shadow: 0 0 0 1px #0d4cd3 inset;
+        }
+        .candidate.selected::after {
+            content: "✓";
+            position: absolute; top: 12px; right: 14px;
+            width: 22px; height: 22px;
+            background: #0d4cd3; color: #fff;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 700;
+        }
+
+        /* Режим результатов */
+        .candidate.readonly { cursor: default; }
+        .candidate.readonly:hover { border-color: #dfe3e8; background: #fff; }
+        .candidate.leading {
+            border-color: #128a3a;
+            background: #f0fdf4;
+        }
+        .candidate.leading::before {
+            content: "🏆";
+            position: absolute; top: 10px; right: 46px;
+            font-size: 18px;
+        }
+
+        .candidate__photo {
+            width: 84px; height: 100px; flex-shrink: 0;
+            border: 1px solid #dfe3e8; border-radius: 4px;
+            background: #f2f4f7; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px; font-weight: 700; color: #0d4cd3;
+            text-transform: uppercase;
+        }
+        .candidate__photo img { width: 100%; height: 100%; object-fit: cover; }
+        .candidate__info { flex: 1; min-width: 0; }
+        .candidate__name {
+            font-size: 16px; font-weight: 700;
+            color: #1c1c1c; margin-bottom: 4px;
+        }
+        .candidate__meta { font-size: 13px; color: #4b5563; margin-bottom: 8px; }
+        .candidate__meta .label {
+            color: #6b7280; display: inline-block; min-width: 70px;
+        }
+        .candidate__program {
+            font-size: 13px; color: #4b5563;
+            padding-top: 8px; border-top: 1px dashed #e7eaee;
+        }
+
+        /* ─── БЕЙДЖ ГОЛОСОВ ─── */
+        .candidate__votes {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: #0d4cd3;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .candidate__votes .count {
+            font-size: 16px;
+            font-weight: 800;
+            font-family: 'Courier New', monospace;
+        }
+        .candidate.leading .candidate__votes {
+            background: #128a3a;
+        }
+
+        /* Прогресс-бар */
+        .candidate__bar {
+            margin-top: 8px;
+            height: 6px;
+            background: #e7eaee;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .candidate__bar > div {
+            height: 100%;
+            background: #0d4cd3;
+            width: 0;
+            transition: width 0.6s ease;
+        }
+        .candidate.leading .candidate__bar > div {
+            background: #128a3a;
+        }
+
+        .vote-actions {
+            margin-top: 22px; padding-top: 22px;
+            border-top: 1px solid #e7eaee;
+            display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        }
+        .btn {
+            font-family: inherit; font-size: 15px; font-weight: 700;
+            padding: 12px 28px; border-radius: 4px; border: none;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .btn-primary { background: #0d4cd3; color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: #0a3da8; }
+        .btn-primary:disabled {
+            background: #c9d2e0; color: #6b7280; cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #fff; color: #0d2c6b;
+            border: 1px solid #c9d2e0;
+            padding: 8px 16px; font-size: 13px;
+        }
+        .btn-secondary:hover { background: #f2f4f7; }
+        .vote-hint { font-size: 13px; color: #6b7280; }
+
+        .status-box {
+            margin-top: 20px;
+            padding: 16px 18px;
+            background: #fafbfc;
+            border: 1px solid #e7eaee;
+            border-left: 4px solid #6b7280;
+            border-radius: 4px;
+            font-size: 13px;
+            display: none;
+        }
+        .status-box.show { display: block; }
+        .status-box.pending   { border-left-color: #0d4cd3; background: #eef4ff; }
+        .status-box.success   { border-left-color: #128a3a; background: #ecfdf3; }
+        .status-box.error     { border-left-color: #b42318; background: #fef3f2; }
+
+        .status-box__title {
+            font-weight: 700; color: #0d2c6b;
+            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .status-box__spinner {
+            width: 14px; height: 14px;
+            border: 2px solid #c9d2e0;
+            border-top-color: #0d4cd3;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        .status-box.pending .status-box__spinner { display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .status-box__row {
+            display: flex; gap: 8px;
+            padding: 3px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .status-box__row .key { min-width: 140px; color: #6b7280; }
+        .status-box__row .val { color: #1c1c1c; word-break: break-all; }
+
+        .empty-state {
+            text-align: center; padding: 40px 20px;
+            color: #6b7280; font-size: 14px;
+        }
+
+        .sidebar { display: flex; flex-direction: column; gap: 20px; }
+        .sidebar-block {
+            background: #fff; border: 1px solid #dfe3e8;
+            border-radius: 6px; padding: 18px;
+        }
+        .sidebar-block h3 {
+            font-size: 15px; color: #0d2c6b;
+            margin-bottom: 12px; padding-bottom: 10px;
+            border-bottom: 1px solid #e7eaee;
+        }
+        .sidebar-block ul { list-style: none; }
+        .sidebar-block li {
+            font-size: 13px; color: #4b5563;
+            padding: 6px 0;
+            border-bottom: 1px dashed #eef0f3;
+        }
+        .sidebar-block li:last-child { border-bottom: none; }
+
+        .footer {
+            background: #0d2c6b; color: #c3cde2;
+            margin-top: 40px; padding: 28px 24px;
+            font-size: 13px;
+        }
+        .footer__inner {
+            max-width: 1200px; margin: 0 auto;
+            display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px;
+        }
+        .footer h4 { color: #fff; font-size: 14px; margin-bottom: 12px; font-weight: 700; }
+        .footer a { color: #c3cde2; text-decoration: none; display: block; padding: 3px 0; }
+        .footer a:hover { color: #fff; text-decoration: underline; }
+        .footer__bottom {
+            max-width: 1200px; margin: 24px auto 0;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            font-size: 12px; color: #8b9ac0;
+            display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+        }
+
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .footer__inner { grid-template-columns: 1fr; gap: 20px; }
+        }
+        @media (max-width: 600px) {
+            .top-bar__links { display: none; }
+            .site-header__inner { padding: 14px 16px; }
+            .emblem { width: 46px; height: 46px; font-size: 18px; }
+            .site-title h1 { font-size: 16px; }
+            .main { padding: 16px; }
+            .breadcrumbs { padding: 12px 16px 0; }
+            .card__body { padding: 16px; }
+            .candidate { padding: 14px; gap: 12px; }
+            .candidate__photo { width: 64px; height: 78px; font-size: 24px; }
+            .vote-actions { flex-direction: column; align-items: stretch; }
+            .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="top-bar__inner">
+            <span class="top-bar__flag">Официальный портал государственных органов</span>
+            <span class="top-bar__links">
+                <a href="#">Главная</a>
+                <a href="#">Обращения</a>
+                <a href="#">Помощь</a>
+            </span>
+        </div>
+    </div>
+
+    <header class="site-header">
+        <div class="site-header__inner">
+            <div class="emblem">ВК</div>
+            <div class="site-title">
+                <h1>Избирательная комиссия Одномандатного округа №1</h1>
+                <p>Официальный сервис дистанционного голосования</p>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumbs">
+        <a href="#">Главная</a>
+        <span>/</span>
+        <a href="#">Выборы депутата</a>
+        <span>/</span>
+        Округ №1
+    </nav>
+
+    <main class="main">
+        <div class="layout">
+
+            <div>
+                <div class="card">
+                    <div class="card__header">
+                        <div>
+                            <h2>Выборы депутата по одномандатному округу №1</h2>
+                            <p id="subtitle">Выберите одного кандидата и нажмите «Проголосовать»</p>
+                        </div>
+                        <button class="btn btn-secondary" id="refreshBtn">↻ Обновить</button>
+                    </div>
+
+                    <div class="card__body">
+
+                        <div class="info-strip">
+                            <strong>Внимание.</strong> Голосование доступно один раз.
+                            Голос считается действительным при выборе одного кандидата.
+                        </div>
+
+                        <div class="success-box" id="successBox">
+                            <strong>Голос успешно учтён</strong>
+                            Ниже показаны текущие результаты голосования.
+                        </div>
+
+                        <div class="empty-state" id="loadingState">Загрузка списка кандидатов…</div>
+                        <div class="empty-state" id="emptyState" style="display:none;">
+                            Список кандидатов пуст.
+                        </div>
+                        <div class="empty-state" id="errorState" style="display:none; color:#b42318;"></div>
+
+                        <div class="candidates-list" id="candidatesList"></div>
+
+                        <div class="vote-actions">
+                            <button class="btn btn-primary" id="voteBtn" disabled>Проголосовать</button>
+                            <span class="vote-hint" id="voteHint">Выберите кандидата</span>
+                        </div>
+
+                        <div class="status-box" id="statusBox">
+                            <div class="status-box__title">
+                                <span class="status-box__spinner"></span>
+                                <span id="statusTitle">Статус</span>
+                            </div>
+                            <div id="statusRows"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <aside class="sidebar">
+                <div class="sidebar-block">
+                    <h3>Информация о голосовании</h3>
+                    <ul>
+                        <li><strong>Округ:</strong> №1</li>
+                        <li><strong>Тип выборов:</strong> Депутат</li>
+                        <li><strong>Дата:</strong> <span id="dateNow"></span></li>
+                        <li><strong>Статус:</strong> <span id="statusLabel">Идёт голосование</span></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-block">
+                    <h3>Порядок голосования</h3>
+                    <ul>
+                        <li>Ознакомьтесь с программами кандидатов</li>
+                        <li>Отметьте одного кандидата</li>
+                        <li>Нажмите «Проголосовать»</li>
+                        <li>Голос нельзя изменить после отправки</li>
+                    </ul>
+                </div>
+            </aside>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer__inner">
+            <div>
+                <h4>Избирательная комиссия Одномандатного округа №1</h4>
+                <p>Официальный сервис дистанционного голосования. Все данные защищены в соответствии с законодательством.</p>
+            </div>
+            <div>
+                <h4>Разделы</h4>
+                <a href="#">Список кандидатов</a>
+                <a href="#">Итоги голосования</a>
+                <a href="#">Нормативные документы</a>
+            </div>
+            <div>
+                <h4>Контакты</h4>
+                <a href="#">Горячая линия</a>
+                <a href="#">Обратная связь</a>
+                <a href="#">Техническая поддержка</a>
+            </div>
+        </div>
+        <div class="footer__bottom">
+            <span>© <span id="year"></span> Избирательная комиссия. Все права защищены.</span>
+            <span>Версия 1.2</span>
+        </div>
+    </footer>
+
+    <script>
+        // ================================================================
+        //  НАСТРОЙКА API
+        // ================================================================
+        const API = {
+            baseUrl: '',
+            candidates: '/api/candidates',
+            vote: '/api/vote'
+        };
+
+        // ================================================================
+        //  СОСТОЯНИЕ
+        // ================================================================
+        let candidates = [];
+        let selectedId = null;
+        let voted = false;
+
+        // ================================================================
+        //  ДАТА / ГОД
+        // ================================================================
+        const now = new Date();
+        document.getElementById('dateNow').textContent =
+            now.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+        document.getElementById('year').textContent = now.getFullYear();
+
+        // ================================================================
+        //  УТИЛИТЫ
+        // ================================================================
+        function uuidv4() {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = [...bytes].map(b => b.toString(16).padStart(2, '0'));
+            return hex.slice(0,4).join('') + '-' +
+                   hex.slice(4,6).join('') + '-' +
+                   hex.slice(6,8).join('') + '-' +
+                   hex.slice(8,10).join('') + '-' +
+                   hex.slice(10,16).join('');
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function shortId(id) {
+            const s = String(id ?? '');
+            return s.length > 12 ? s.slice(0, 6) + '…' + s.slice(-4) : s;
+        }
+
+        // ================================================================
+        //  СТАТУС-БЛОК
+        // ================================================================
+        function showStatus(state, title, rows) {
+            const box = document.getElementById('statusBox');
+            box.className = 'status-box show ' + (state || '');
+            document.getElementById('statusTitle').textContent = title;
+
+            const rowsEl = document.getElementById('statusRows');
+            rowsEl.innerHTML = '';
+            (rows || []).forEach(({ key, value }) => {
+                const row = document.createElement('div');
+                row.className = 'status-box__row';
+                row.innerHTML = `<span class="key">${escapeHtml(key)}:</span>
+                                 <span class="val">${escapeHtml(String(value))}</span>`;
+                rowsEl.appendChild(row);
+            });
+        }
+
+        // ================================================================
+        //  ЗАГРУЗКА КАНДИДАТОВ
+        // ================================================================
+        async function loadCandidates() {
+            const loading = document.getElementById('loadingState');
+            const empty   = document.getElementById('emptyState');
+            const error   = document.getElementById('errorState');
+            const list    = document.getElementById('candidatesList');
+
+            loading.style.display = 'block';
+            empty.style.display = 'none';
+            error.style.display = 'none';
+            list.innerHTML = '';
+
+            try {
+                const response = await fetch(API.baseUrl + API.candidates, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                candidates = Array.isArray(data) ? data : (data.candidates || []);
+
+                loading.style.display = 'none';
+
+                if (candidates.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                renderCandidates();
+
+            } catch (err) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = 'Не удалось загрузить список кандидатов: ' + err.message;
+            }
+        }
+
+        // ================================================================
+        //  ОТРИСОВКА КАНДИДАТОВ
+        // ================================================================
+        function renderCandidates() {
+            const list = document.getElementById('candidatesList');
+            list.innerHTML = '';
+
+            // Если уже проголосовали — сортируем по голосам и показываем результаты
+            let display = [...candidates];
+            if (voted) {
+                display.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+            }
+
+            const maxVotes = voted
+                ? Math.max(1, ...display.map(c => c.votes || 0))
+                : 1;
+
+            display.forEach((c, idx) => {
+                const id = c.id ?? c._id ?? c.candidate_id;
+                const card = document.createElement('div');
+                card.className = 'candidate' + (voted ? ' readonly' : '');
+
+                // Подсветка лидера (первый в отсортированном списке)
+                if (voted && idx === 0 && (c.votes || 0) > 0) {
+                    card.classList.add('leading');
+                }
+
+                card.dataset.id = id;
+
+                const initial = (c.name || '?').charAt(0).toUpperCase();
+                const photoHtml = c.photo
+                    ? `<img src="${escapeHtml(c.photo)}" alt="${escapeHtml(c.name)}" onerror="this.parentNode.innerHTML='<span>${initial}</span>'">`
+                    : `<span>${initial}</span>`;
+
+                // Бейдж и прогресс-бар показываем только после голосования
+                const votesNum = c.votes || 0;
+                const votesBlock = voted ? `
+                    <div class="candidate__votes">
+                        Голосов: <span class="count">${votesNum}</span>
+                    </div>
+                    <div class="candidate__bar">
+                        <div style="width:${Math.round((votesNum / maxVotes) * 100)}%"></div>
+                    </div>
+                ` : '';
+
+                card.innerHTML = `
+                    <div class="candidate__photo">${photoHtml}</div>
+                    <div class="candidate__info">
+                        <div class="candidate__name">${escapeHtml(c.name || 'Без имени')}</div>
+                        <div class="candidate__meta">
+                            <span class="label">Выдвижение:</span>
+                            <span>${escapeHtml(c.party || 'Самовыдвиженец')}</span>
+                        </div>
+                        <div class="candidate__program">${escapeHtml(c.program || '')}</div>
+                        ${votesBlock}
+                    </div>
+                `;
+
+                if (!voted) {
+                    card.addEventListener('click', () => {
+                        document.querySelectorAll('.candidate').forEach(el => el.classList.remove('selected'));
+                        card.classList.add('selected');
+                        selectedId = id;
+                        document.getElementById('voteBtn').disabled = false;
+                        document.getElementById('voteHint').textContent = 'Выбран: ' + (c.name || '');
+                    });
+                }
+
+                list.appendChild(card);
+            });
+        }
+
+        // ================================================================
+        //  ОТПРАВКА ГОЛОСА
+        // ================================================================
+        async function sendVote(candidateId) {
+            const requestId = uuidv4();
+            const payload = {
+                request_id: requestId,
+                candidate_id: candidateId,
+                timestamp: new Date().toISOString()
+            };
+
+            showStatus('pending', 'Отправка голоса на сервер…', [
+                { key: 'POST', value: API.baseUrl + API.vote },
+                { key: 'request_id', value: requestId },
+                { key: 'candidate_id', value: shortId(candidateId) }
+            ]);
+
+            const t0 = performance.now();
+
+            try {
+                const response = await fetch(API.baseUrl + API.vote, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const dt = Math.round(performance.now() - t0);
+                let data = null;
+                try { data = await response.json(); } catch (e) {}
+
+                const rows = [
+                    { key: 'HTTP-статус', value: response.status + ' ' + response.statusText },
+                    { key: 'Время ответа', value: dt + ' мс' },
+                    { key: 'request_id', value: requestId }
+                ];
+
+                if (data && typeof data === 'object') {
+                    Object.entries(data).forEach(([k, v]) => {
+                        rows.push({ key: k, value: typeof v === 'object' ? JSON.stringify(v) : v });
+                    });
+                }
+
+                if (response.ok) {
+                    showStatus('success', 'Голос успешно принят сервером', rows);
+
+                    voted = true;
+                    document.getElementById('voteBtn').disabled = true;
+                    document.getElementById('voteBtn').textContent = 'Голос отправлен';
+                    document.getElementById('voteHint').textContent = '';
+                    document.getElementById('successBox').classList.add('show');
+                    document.getElementById('subtitle').textContent =
+                        'Результаты голосования (обновлено после вашего голоса)';
+                    document.getElementById('statusLabel').textContent = 'Голосование завершено для вас';
+
+                    // ▼▼▼ КЛЮЧЕВОЕ: перезагружаем список, чтобы получить
+                    // актуальные голоса со всех устройств ▼▼▼
+                    await loadCandidates();
+
+                } else {
+                    showStatus('error', 'Сервер отклонил голос', rows);
+                    document.getElementById('voteBtn').disabled = false;
+                }
+
+            } catch (err) {
+                const dt = Math.round(performance.now() - t0);
+                showStatus('error', 'Сетевая ошибка при отправке', [
+                    { key: 'POST', value: API.baseUrl + API.vote },
+                    { key: 'request_id', value: requestId },
+                    { key: 'Время', value: dt + ' мс' },
+                    { key: 'Ошибка', value: err.message || String(err) }
+                ]);
+                document.getElementById('voteBtn').disabled = false;
+            }
+        }
+
+        // ================================================================
+        //  ОБРАБОТЧИКИ
+        // ================================================================
+        document.getElementById('voteBtn').addEventListener('click', () => {
+            if (voted || !selectedId) return;
+            sendVote(selectedId);
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            if (voted) return;
+            selectedId = null;
+            document.getElementById('voteBtn').disabled = true;
+            document.getElementById('voteHint').textContent = 'Выберите кандидата';
+            loadCandidates();
+        });
+
+        // ================================================================
+        //  ИНИЦИАЛИЗАЦИЯ
+        // ================================================================
+        loadCandidates();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
+    <script>
+      const fpPromise = FingerprintJS.load();
+      fpPromise.then(fp => fp.get()).then(r => {
+          localStorage.setItem('fp_id', r.visitorId);
+      });
+
+      async function vote(candidateId) {
+          const fp = await FingerprintJS.load();
+          const { visitorId } = await fp.get();
+          await fetch('/api/vote', {
+              method: 'POST',
+              body: JSON.stringify({ candidate_id: candidateId, fingerprint: visitorId })
+          });
+      }
+    </script>
+</body>
+</html>

@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — Дистанционное электронное голосование</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'PT Sans', 'Segoe UI', Arial, sans-serif;
+            background: #f2f4f7;
+            color: #1c1c1c;
+            font-size: 15px;
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .top-bar {
+            background: #0d4cd3;
+            color: #fff;
+            font-size: 13px;
+            padding: 6px 0;
+            border-bottom: 3px solid #ffcc00;
+        }
+        .top-bar__inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+        .top-bar__flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+        .top-bar__flag::before {
+            content: "";
+            display: inline-block;
+            width: 22px;
+            height: 15px;
+            background: linear-gradient(to bottom, #fff 33.3%, #0d4cd3 33.3%, #0d4cd3 66.6%, #d52b1e 66.6%);
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+        .top-bar__links a {
+            color: #fff;
+            text-decoration: none;
+            opacity: 0.9;
+            margin-left: 18px;
+        }
+        .top-bar__links a:hover { text-decoration: underline; opacity: 1; }
+
+        .site-header { background: #fff; border-bottom: 1px solid #dfe3e8; }
+        .site-header__inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .emblem {
+            width: 56px; height: 56px; flex-shrink: 0;
+            background: #0d4cd3; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 22px;
+            border: 2px solid #ffcc00;
+        }
+        .site-title h1 { font-size: 19px; font-weight: 700; color: #0d2c6b; }
+        .site-title p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+        .breadcrumbs {
+            max-width: 1200px; margin: 0 auto;
+            padding: 14px 24px 0;
+            font-size: 13px; color: #6b7280;
+        }
+        .breadcrumbs a { color: #0d4cd3; text-decoration: none; }
+        .breadcrumbs a:hover { text-decoration: underline; }
+        .breadcrumbs span { margin: 0 6px; color: #b0b6bf; }
+
+        .main {
+            flex: 1;
+            max-width: 1200px; width: 100%;
+            margin: 0 auto; padding: 24px;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px; align-items: start;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+        }
+        .card__header {
+            padding: 22px 28px 18px;
+            border-bottom: 1px solid #e7eaee;
+        }
+        .card__header h2 {
+            font-size: 22px;
+            color: #0d2c6b;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .card__header p { font-size: 14px; color: #6b7280; }
+        .card__body { padding: 28px; }
+
+        .info-strip {
+            background: #eef4ff;
+            border-left: 4px solid #0d4cd3;
+            padding: 14px 18px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #17356e;
+            margin-bottom: 24px;
+        }
+        .info-strip strong { color: #0d2c6b; }
+
+        .form-group { margin-bottom: 20px; }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        .form-group label .required { color: #b42318; }
+
+        .code-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-align: center;
+            text-transform: uppercase;
+            border: 2px solid #c9d2e0;
+            border-radius: 4px;
+            color: #0d2c6b;
+            background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .code-input:focus {
+            outline: none;
+            border-color: #0d4cd3;
+            box-shadow: 0 0 0 4px rgba(13, 76, 211, 0.12);
+        }
+        .code-input.error {
+            border-color: #b42318;
+            box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.12);
+        }
+        .code-input:disabled {
+            background: #f2f4f7;
+            cursor: not-allowed;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+
+        .message {
+            display: none;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 14px;
+            border-left: 4px solid;
+        }
+        .message.show { display: block; }
+        .message.error {
+            background: #fef3f2;
+            border-color: #b42318;
+            color: #7a271a;
+        }
+        .message.success {
+            background: #ecfdf3;
+            border-color: #128a3a;
+            color: #0f5132;
+        }
+        .message.info {
+            background: #eef4ff;
+            border-color: #0d4cd3;
+            color: #17356e;
+        }
+
+        .btn {
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 14px 28px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn-primary {
+            background: #0d4cd3;
+            color: #fff;
+            width: 100%;
+        }
+        .btn-primary:hover:not(:disabled) { background: #0a3da8; }
+        .btn-primary:disabled {
+            background: #c9d2e0;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+
+        .btn-spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        .btn.loading .btn-spinner { display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .turnstile-wrap {
+            margin-top: 14px;
+            min-height: 0;
+        }
+
+        .help-links {
+            margin-top: 22px;
+            padding-top: 22px;
+            border-top: 1px solid #e7eaee;
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .help-links a {
+            color: #0d4cd3;
+            text-decoration: none;
+            margin-right: 16px;
+        }
+        .help-links a:hover { text-decoration: underline; }
+
+        .sidebar { display: flex; flex-direction: column; gap: 20px; }
+        .sidebar-block {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+            padding: 18px;
+        }
+        .sidebar-block h3 {
+            font-size: 15px;
+            color: #0d2c6b;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e7eaee;
+        }
+        .sidebar-block ul { list-style: none; }
+        .sidebar-block li {
+            font-size: 13px;
+            color: #4b5563;
+            padding: 8px 0;
+            border-bottom: 1px dashed #eef0f3;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .sidebar-block li:last-child { border-bottom: none; }
+        .sidebar-block li::before {
+            content: "•";
+            color: #0d4cd3;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .sidebar-block--warn {
+            background: #fffbeb;
+            border-color: #fcd34d;
+        }
+        .sidebar-block--warn h3 {
+            color: #7c2d12;
+            border-bottom-color: #fde68a;
+        }
+        .sidebar-block--warn li::before { color: #b45309; }
+        .sidebar-block--warn li { color: #78350f; }
+
+        .footer {
+            background: #0d2c6b;
+            color: #c3cde2;
+            margin-top: 40px;
+            padding: 28px 24px;
+            font-size: 13px;
+        }
+        .footer__inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 32px;
+        }
+        .footer h4 {
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+        .footer a {
+            color: #c3cde2;
+            text-decoration: none;
+            display: block;
+            padding: 3px 0;
+        }
+        .footer a:hover { color: #fff; text-decoration: underline; }
+        .footer__bottom {
+            max-width: 1200px;
+            margin: 24px auto 0;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            font-size: 12px;
+            color: #8b9ac0;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .footer__inner { grid-template-columns: 1fr; gap: 20px; }
+        }
+        @media (max-width: 600px) {
+            .top-bar__links { display: none; }
+            .site-header__inner { padding: 14px 16px; }
+            .emblem { width: 46px; height: 46px; font-size: 18px; }
+            .site-title h1 { font-size: 16px; }
+            .main { padding: 16px; }
+            .breadcrumbs { padding: 12px 16px 0; }
+            .card__header { padding: 18px 20px 14px; }
+            .card__header h2 { font-size: 19px; }
+            .card__body { padding: 20px; }
+            .code-input { font-size: 18px; padding: 12px 14px; letter-spacing: 3px; }
+            .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="top-bar__inner">
+            <span class="top-bar__flag">Официальный портал государственных органов</span>
+            <span class="top-bar__links">
+                <a href="#">Главная</a>
+                <a href="#">Обращения</a>
+                <a href="#">Помощь</a>
+            </span>
+        </div>
+    </div>
+
+    <header class="site-header">
+        <div class="site-header__inner">
+            <div class="emblem">ДЭГ</div>
+            <div class="site-title">
+                <h1>Портал дистанционного электронного голосования</h1>
+                <p>Одномандатный избирательный округ №1</p>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumbs">
+        <a href="#">Главная</a>
+        <span>/</span>
+        <a href="#">Выборы депутата</a>
+        <span>/</span>
+        Вход в систему
+    </nav>
+
+    <main class="main">
+        <div class="layout">
+
+            <div>
+                <div class="card">
+                    <div class="card__header">
+                        <h2>Вход в систему голосования</h2>
+                        <p>Для получения доступа введите код избирателя</p>
+                    </div>
+
+                    <div class="card__body">
+
+                        <div class="info-strip">
+                            <strong>Как получить код.</strong>
+                            Код избирателя выдаётся лично на избирательном участке
+                            при предъявлении паспорта. Один код — один голос.
+                        </div>
+
+                        <form id="loginForm" autocomplete="off">
+
+                            <div class="form-group">
+                                <label for="codeInput">
+                                    Код избирателя <span class="required">*</span>
+                                </label>
+
+                                <input type="text"
+                                       id="codeInput"
+                                       class="code-input"
+                                       placeholder="XXXX-XXXX-XXXX-XXXX"
+                                       maxlength="19"
+                                       inputmode="text"
+                                       autocapitalize="characters"
+                                       spellcheck="false"
+                                       autocomplete="off">
+
+                                <div class="form-hint">
+                                    16 символов. Формат: XXXX-XXXX-XXXX-XXXX.
+                                    Дефисы подставляются автоматически.
+                                </div>
+                            </div>
+
+                            <div class="turnstile-wrap">
+                                <div class="cf-turnstile"
+                                     data-sitekey="0x4AAAAAAFB9p3PyYAQY7ewB"
+                                     data-theme="light"
+                                     data-language="ru"
+                                     data-size="flexible"
+                                     data-callback="onTurnstileSuccess"
+                                     data-expired-callback="onTurnstileExpired"
+                                     data-error-callback="onTurnstileError"></div>
+                            </div>
+
+                            <div class="message error" id="errorMsg"></div>
+                            <div class="message info" id="infoMsg"></div>
+
+                            <button type="submit" id="submitBtn" class="btn btn-primary" disabled style="margin-top:16px;">
+                                <span class="btn-spinner"></span>
+                                <span>Войти и продолжить</span>
+                            </button>
+
+                        </form>
+
+                        <div class="help-links">
+                            <a href="#">Не приходит код?</a>
+                            <a href="#">Потеряли код?</a>
+                            <a href="#">Инструкция</a>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <aside class="sidebar">
+
+                <div class="sidebar-block">
+                    <h3>Порядок входа</h3>
+                    <ul>
+                        <li>Введите 16-значный код, выданный на участке</li>
+                        <li>Пройдите автоматическую проверку</li>
+                        <li>Выберите кандидата и проголосуйте</li>
+                        <li>Голос нельзя изменить после отправки</li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-block">
+                    <h3>Технические требования</h3>
+                    <ul>
+                        <li>Современный браузер (Chrome, Firefox, Safari, Edge)</li>
+                        <li>Стабильное интернет-соединение</li>
+                        <li>Отключены блокировщики рекламы</li>
+                        <li>Включён JavaScript</li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-block sidebar-block--warn">
+                    <h3>Безопасность</h3>
+                    <ul>
+                        <li>Никому не сообщайте свой код</li>
+                        <li>Сотрудники комиссии никогда не спрашивают код</li>
+                        <li>Голосуйте только на официальном портале</li>
+                        <li>Проверьте адрес сайта в адресной строке</li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-block">
+                    <h3>Нужна помощь?</h3>
+                    <ul>
+                        <li>Горячая линия: 8-800-XXX-XX-XX</li>
+                        <li>Круглосуточно, бесплатно</li>
+                        <li>support@example.ru</li>
+                    </ul>
+                </div>
+
+            </aside>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer__inner">
+            <div>
+                <h4>Портал дистанционного электронного голосования</h4>
+                <p>Официальный сервис. Все данные защищены в соответствии с законодательством о персональных данных. Соединение защищено по протоколу TLS 1.3.</p>
+            </div>
+            <div>
+                <h4>Разделы</h4>
+                <a href="#">Инструкция по голосованию</a>
+                <a href="#">Ответы на вопросы</a>
+                <a href="#">Нормативные документы</a>
+            </div>
+            <div>
+                <h4>Контакты</h4>
+                <a href="#">Горячая линия</a>
+                <a href="#">Обратная связь</a>
+                <a href="#">Техническая поддержка</a>
+            </div>
+        </div>
+        <div class="footer__bottom">
+            <span>© <span id="year"></span> Избирательная комиссия. Все права защищены.</span>
+            <span>Версия 1.0</span>
+        </div>
+    </footer>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════
+        //  ГОД
+        // ═══════════════════════════════════════════════════════════
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // ═══════════════════════════════════════════════════════════
+        //  НАСТРОЙКА API
+        // ═══════════════════════════════════════════════════════════
+        const API_CHECK_URL = '/api/check';
+
+        // ═══════════════════════════════════════════════════════════
+        //  ЭЛЕМЕНТЫ
+        // ═══════════════════════════════════════════════════════════
+        const form = document.getElementById('loginForm');
+        const codeInput = document.getElementById('codeInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const infoMsg = document.getElementById('infoMsg');
+
+        // ═══════════════════════════════════════════════════════════
+        //  TURNSTILE CALLBACKS (глобальные — Cloudflare их ищет)
+        // ═══════════════════════════════════════════════════════════
+        window.onTurnstileSuccess = function(token) {
+            console.log('Turnstile пройден');
+            submitBtn.disabled = false;
+        };
+
+        window.onTurnstileExpired = function() {
+            console.log('Turnstile истёк');
+            submitBtn.disabled = true;
+        };
+
+        window.onTurnstileError = function(code) {
+            console.error('Turnstile ошибка:', code);
+            submitBtn.disabled = true;
+            showError('Ошибка проверки безопасности. Обновите страницу.');
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        //  АВТОФОРМАТ КОДА
+        // ═══════════════════════════════════════════════════════════
+        codeInput.addEventListener('input', (e) => {
+            let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            v = v.slice(0, 16);
+            const blocks = v.match(/.{1,4}/g) || [];
+            e.target.value = blocks.join('-');
+            codeInput.classList.remove('error');
+            hideMessages();
+        });
+
+        codeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace') {
+                const pos = codeInput.selectionStart;
+                if (pos > 0 && codeInput.value[pos - 1] === '-') {
+                    e.preventDefault();
+                    const v = codeInput.value.slice(0, pos - 1) + codeInput.value.slice(pos);
+                    codeInput.value = v;
+                    codeInput.setSelectionRange(pos - 1, pos - 1);
+                }
+            }
+        });
+
+        codeInput.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            let v = pasted.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+            const blocks = v.match(/.{1,4}/g) || [];
+            codeInput.value = blocks.join('-');
+            codeInput.classList.remove('error');
+            hideMessages();
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        //  ВСПОМОГАТЕЛЬНЫЕ
+        // ═══════════════════════════════════════════════════════════
+        function showError(text) {
+            errorMsg.textContent = text;
+            errorMsg.classList.add('show');
+            infoMsg.classList.remove('show');
+        }
+
+        function showInfo(text) {
+            infoMsg.textContent = text;
+            infoMsg.classList.add('show');
+            errorMsg.classList.remove('show');
+        }
+
+        function hideMessages() {
+            errorMsg.classList.remove('show');
+            infoMsg.classList.remove('show');
+        }
+
+        function setLoading(loading) {
+            if (loading) {
+                submitBtn.classList.add('loading');
+                submitBtn.disabled = true;
+                codeInput.disabled = true;
+            } else {
+                submitBtn.classList.remove('loading');
+                submitBtn.disabled = false;
+                codeInput.disabled = false;
+            }
+        }
+
+        function getTurnstileToken() {
+            const el = document.querySelector('[name="cf-turnstile-response"]');
+            return el ? el.value : '';
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ОТПРАВКА ФОРМЫ
+        // ═══════════════════════════════════════════════════════════
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessages();
+
+            const raw = codeInput.value.replace(/-/g, '');
+
+            // Валидация
+            if (raw.length !== 16) {
+                codeInput.classList.add('error');
+                showError('Код должен содержать 16 символов');
+                codeInput.focus();
+                return;
+            }
+
+            if (!/^[A-Z0-9]{16}$/.test(raw)) {
+                codeInput.classList.add('error');
+                showError('Код может содержать только буквы и цифры');
+                codeInput.focus();
+                return;
+            }
+
+            const turnstileToken = getTurnstileToken();
+            if (!turnstileToken) {
+                showInfo('Дождитесь окончания проверки безопасности…');
+                return;
+            }
+
+            setLoading(true);
+            showInfo('Проверяем код…');
+
+            try {
+                const response = await fetch(API_CHECK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: raw,
+                        turnstile: turnstileToken,
+                        ts: new Date().toISOString()
+                    })
+                });
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    codeInput.classList.add('error');
+                    showError(data.error || 'Не удалось проверить код');
+                    if (window.turnstile) {
+                        try { window.turnstile.reset(); } catch (_) {}
+                    }
+                    setLoading(false);
+                    return;
+                }
+
+                // ▼▼▼ УСПЕХ — РЕДИРЕКТ ▼▼▼
+                showInfo('Код принят. Переходим к голосованию…');
+                window.location.href = data.redirect;
+
+            } catch (err) {
+                console.error('Ошибка:', err);
+                showError('Ошибка сети: ' + (err.message || 'не удалось связаться с сервером'));
+                if (window.turnstile) {
+                    try { window.turnstile.reset(); } catch (_) {}
+                }
+                setLoading(false);
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        //  ФОКУС
+        // ═══════════════════════════════════════════════════════════
+        window.addEventListener('load', () => {
+            codeInput.focus();
+        });
+    </script>
+
+</body>
+</html>
