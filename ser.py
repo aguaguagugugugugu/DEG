@@ -142,7 +142,8 @@ def vote():
 
     # ─── 2. Вся логика голоса — под одним локом ───
     with _lock:
-
+        if not get_country(get_ip()) == 'RU':
+            return jsonify(status="Russia only", request_id=request_id), 403
         # 2.1. Идемпотентность: этот request_id уже голосовал?
         if any(v['request_id'] == request_id for v in votes_store):
             return jsonify(status="duplicate", request_id=request_id), 409
