@@ -2,12 +2,13 @@ from flask import Flask, send_from_directory, jsonify, request,render_template,r
 import uuid
 import hmac
 import os
-from datetime import datetime
+from datetime import datetime,timezone
 import bcrypt
 import requests
 import threading
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import secrets
 _lock = threading.Lock()
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.urandom(32)   
@@ -37,7 +38,7 @@ seen_requests = set()
 # ─── Секретный токен для админ-операций ───
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
 TURNSTILE_SECRET = os.environ.get("SECRET")
-print(TURNSTILE_SECRET)
+print(repr(TURNSTILE_SECRET))
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 # ═══════════════════════════════════════════════════
 #  ВСПОМОГАТЕЛЬНОЕ — проверка админ-токена
@@ -57,12 +58,26 @@ def get_country(ip):
 # ═══════════════════════════════════════════════════
 #  ГЛАВНАЯ СТРАНИЦА
 # ═══════════════════════════════════════════════════
+def get_csrf_token() -> str:
+    """Возвращает CSRF-токен сессии (создаёт при первом вызове)."""
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_urlsafe(32)
+    return session['csrf_token']
+
+
+def check_csrf() -> bool:
+    """Проверяет CSRF-токен из заголовка X-CSRF-Token."""
+    expected = session.get('csrf_token')
+    if not expected:
+        return False
+    provided = request.headers.get('X-CSRF-Token', '')
+    return hmac.compare_digest(provided, expected)
 @limiter.limit("60 per minute") 
 @app.route('/vote')
 def index():
     if session.get('hash') in verifd:
       if get_country(get_ip()) == 'RU':
-        return render_template('index.html')
+        return render_template('index.html',csrf=get_csrf_token())
       else:
         return redirect(url_for('block'))
     else:
@@ -115,7 +130,8 @@ def vote():
     data = request.get_json() or {}
     request_id   = data.get('request_id')
     candidate_id = data.get('candidate_id')
-
+    if not check_csrf():
+        return jsonify(error="Неверный CSRF-токен"), 403
     # ─── 1. Валидация входа ───
     if not request_id or not candidate_id:
         return jsonify(error="request_id и candidate_id обязательны"), 400
@@ -238,7 +254,7 @@ def reset_votes():
 @app.route('/', methods=['POST','GET'])
 def vx ():
     if get_country(get_ip()) == 'RU':
-        return render_template('vxod.html')
+        return render_template('vxod.html',csrf=get_csrf_token())
     else:
         return redirect(url_for('block'))
 @limiter.limit("60 per minute")
@@ -247,6 +263,8 @@ def che ():
     data = request.get_json() or {}
     token = data.get('turnstile', '')
     code = data.get ('code')
+    if not check_csrf():
+        return jsonify(error="Неверный CSRF-токен"), 403
     if not token:
         return jsonify(error="Капча не пройдена"), 400
 
@@ -259,7 +277,7 @@ def che ():
         result = r.json()
     except Exception as e:
         return jsonify(error=f"Ошибка соединения с Cloudflare: {e}"), 500
-
+    print(r.json())
     if not result.get('success'):
         return jsonify(
             error="Капча не прошла проверку",

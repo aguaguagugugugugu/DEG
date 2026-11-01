@@ -357,7 +357,7 @@
         }
     </style>
 </head>
-<body>
+<body data-csrf="{{ csrf }}">
 
     <div class="top-bar">
         <div class="top-bar__inner">
@@ -487,8 +487,8 @@
             <span>Версия 1.2</span>
         </div>
     </footer>
-
     <script>
+        const CSRF = document.body.dataset.csrf;
         // ================================================================
         //  НАСТРОЙКА API
         // ================================================================
@@ -697,9 +697,11 @@
             try {
                 const response = await fetch(API.baseUrl + API.vote, {
                     method: 'POST',
+                    credentials: 'same-origin',          // ← добавить
                     headers: {
                         'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': CSRF,            // ← добавить
                     },
                     body: JSON.stringify(payload)
                 });

@@ -4,7 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход — Дистанционное электронное голосование</title>
+
+    <!-- Turnstile -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+    <!-- Callback ДО виджета -->
+    <script>
+        window.onTurnstileSuccess = function(token) {
+            console.log('✅ Turnstile пройден');
+            const btn = document.getElementById('submitBtn');
+            if (btn) btn.disabled = false;
+        };
+        window.onTurnstileExpired = function() {
+            const btn = document.getElementById('submitBtn');
+            if (btn) btn.disabled = true;
+        };
+        window.onTurnstileError = function(code) {
+            console.error('❌ Turnstile ошибка:', code);
+        };
+    </script>
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -126,7 +145,6 @@
         .info-strip strong { color: #0d2c6b; }
 
         .form-group { margin-bottom: 20px; }
-
         .form-group label {
             display: block;
             font-size: 14px;
@@ -156,10 +174,7 @@
             border-color: #0d4cd3;
             box-shadow: 0 0 0 4px rgba(13, 76, 211, 0.12);
         }
-        .code-input.error {
-            border-color: #b42318;
-            box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.12);
-        }
+        .code-input.error { border-color: #b42318; }
         .code-input:disabled {
             background: #f2f4f7;
             cursor: not-allowed;
@@ -180,21 +195,8 @@
             border-left: 4px solid;
         }
         .message.show { display: block; }
-        .message.error {
-            background: #fef3f2;
-            border-color: #b42318;
-            color: #7a271a;
-        }
-        .message.success {
-            background: #ecfdf3;
-            border-color: #128a3a;
-            color: #0f5132;
-        }
-        .message.info {
-            background: #eef4ff;
-            border-color: #0d4cd3;
-            color: #17356e;
-        }
+        .message.error { background: #fef3f2; border-color: #b42318; color: #7a271a; }
+        .message.info  { background: #eef4ff; border-color: #0d4cd3; color: #17356e; }
 
         .btn {
             font-family: inherit;
@@ -233,10 +235,7 @@
         .btn.loading .btn-spinner { display: inline-block; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .turnstile-wrap {
-            margin-top: 14px;
-            min-height: 0;
-        }
+        .turnstile-wrap { margin-top: 14px; }
 
         .help-links {
             margin-top: 22px;
@@ -309,18 +308,8 @@
             grid-template-columns: 2fr 1fr 1fr;
             gap: 32px;
         }
-        .footer h4 {
-            color: #fff;
-            font-size: 14px;
-            margin-bottom: 12px;
-            font-weight: 700;
-        }
-        .footer a {
-            color: #c3cde2;
-            text-decoration: none;
-            display: block;
-            padding: 3px 0;
-        }
+        .footer h4 { color: #fff; font-size: 14px; margin-bottom: 12px; font-weight: 700; }
+        .footer a { color: #c3cde2; text-decoration: none; display: block; padding: 3px 0; }
         .footer a:hover { color: #fff; text-decoration: underline; }
         .footer__bottom {
             max-width: 1200px;
@@ -354,7 +343,7 @@
         }
     </style>
 </head>
-<body>
+<body data-csrf="{{ csrf }}">
 
     <div class="top-bar">
         <div class="top-bar__inner">
@@ -409,7 +398,6 @@
                                 <label for="codeInput">
                                     Код избирателя <span class="required">*</span>
                                 </label>
-
                                 <input type="text"
                                        id="codeInput"
                                        class="code-input"
@@ -419,7 +407,6 @@
                                        autocapitalize="characters"
                                        spellcheck="false"
                                        autocomplete="off">
-
                                 <div class="form-hint">
                                     16 символов. Формат: XXXX-XXXX-XXXX-XXXX.
                                     Дефисы подставляются автоматически.
@@ -535,46 +522,43 @@
         document.getElementById('year').textContent = new Date().getFullYear();
 
         // ═══════════════════════════════════════════════════════════
-        //  НАСТРОЙКА API
+        //  CSRF-ТОКЕН
         // ═══════════════════════════════════════════════════════════
-        const API_CHECK_URL = '/api/check';
+        const CSRF = document.body.dataset.csrf;
 
         // ═══════════════════════════════════════════════════════════
         //  ЭЛЕМЕНТЫ
         // ═══════════════════════════════════════════════════════════
-        const form = document.getElementById('loginForm');
-        const codeInput = document.getElementById('codeInput');
-        const submitBtn = document.getElementById('submitBtn');
-        const errorMsg = document.getElementById('errorMsg');
-        const infoMsg = document.getElementById('infoMsg');
+        const form       = document.getElementById('loginForm');
+        const codeInput  = document.getElementById('codeInput');
+        const submitBtn  = document.getElementById('submitBtn');
+        const errorMsg   = document.getElementById('errorMsg');
+        const infoMsg    = document.getElementById('infoMsg');
 
         // ═══════════════════════════════════════════════════════════
-        //  TURNSTILE CALLBACKS (глобальные — Cloudflare их ищет)
+        //  ВСПОМОГАТЕЛЬНЫЕ
         // ═══════════════════════════════════════════════════════════
-        window.onTurnstileSuccess = function(token) {
-            console.log('Turnstile пройден');
-            submitBtn.disabled = false;
-        };
+        function showError(t)  { errorMsg.textContent = t; errorMsg.classList.add('show'); infoMsg.classList.remove('show'); }
+        function showInfo(t)   { infoMsg.textContent = t; infoMsg.classList.add('show'); errorMsg.classList.remove('show'); }
+        function hideMessages() { errorMsg.classList.remove('show'); infoMsg.classList.remove('show'); }
 
-        window.onTurnstileExpired = function() {
-            console.log('Turnstile истёк');
-            submitBtn.disabled = true;
-        };
+        function setLoading(on) {
+            submitBtn.classList.toggle('loading', on);
+            submitBtn.disabled = on;
+            codeInput.disabled = on;
+        }
 
-        window.onTurnstileError = function(code) {
-            console.error('Turnstile ошибка:', code);
-            submitBtn.disabled = true;
-            showError('Ошибка проверки безопасности. Обновите страницу.');
-        };
+        function getTurnstileToken() {
+            const el = document.querySelector('[name="cf-turnstile-response"]');
+            return el ? el.value : '';
+        }
 
         // ═══════════════════════════════════════════════════════════
         //  АВТОФОРМАТ КОДА
         // ═══════════════════════════════════════════════════════════
         codeInput.addEventListener('input', (e) => {
-            let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            v = v.slice(0, 16);
-            const blocks = v.match(/.{1,4}/g) || [];
-            e.target.value = blocks.join('-');
+            let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+            e.target.value = (v.match(/.{1,4}/g) || []).join('-');
             codeInput.classList.remove('error');
             hideMessages();
         });
@@ -595,48 +579,10 @@
             e.preventDefault();
             const pasted = (e.clipboardData || window.clipboardData).getData('text');
             let v = pasted.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
-            const blocks = v.match(/.{1,4}/g) || [];
-            codeInput.value = blocks.join('-');
+            codeInput.value = (v.match(/.{1,4}/g) || []).join('-');
             codeInput.classList.remove('error');
             hideMessages();
         });
-
-        // ═══════════════════════════════════════════════════════════
-        //  ВСПОМОГАТЕЛЬНЫЕ
-        // ═══════════════════════════════════════════════════════════
-        function showError(text) {
-            errorMsg.textContent = text;
-            errorMsg.classList.add('show');
-            infoMsg.classList.remove('show');
-        }
-
-        function showInfo(text) {
-            infoMsg.textContent = text;
-            infoMsg.classList.add('show');
-            errorMsg.classList.remove('show');
-        }
-
-        function hideMessages() {
-            errorMsg.classList.remove('show');
-            infoMsg.classList.remove('show');
-        }
-
-        function setLoading(loading) {
-            if (loading) {
-                submitBtn.classList.add('loading');
-                submitBtn.disabled = true;
-                codeInput.disabled = true;
-            } else {
-                submitBtn.classList.remove('loading');
-                submitBtn.disabled = false;
-                codeInput.disabled = false;
-            }
-        }
-
-        function getTurnstileToken() {
-            const el = document.querySelector('[name="cf-turnstile-response"]');
-            return el ? el.value : '';
-        }
 
         // ═══════════════════════════════════════════════════════════
         //  ОТПРАВКА ФОРМЫ
@@ -647,18 +593,14 @@
 
             const raw = codeInput.value.replace(/-/g, '');
 
-            // Валидация
             if (raw.length !== 16) {
                 codeInput.classList.add('error');
                 showError('Код должен содержать 16 символов');
-                codeInput.focus();
                 return;
             }
-
             if (!/^[A-Z0-9]{16}$/.test(raw)) {
                 codeInput.classList.add('error');
                 showError('Код может содержать только буквы и цифры');
-                codeInput.focus();
                 return;
             }
 
@@ -672,11 +614,13 @@
             showInfo('Проверяем код…');
 
             try {
-                const response = await fetch(API_CHECK_URL, {
+                const response = await fetch('/api/check', {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': CSRF,
                     },
                     body: JSON.stringify({
                         code: raw,
@@ -697,9 +641,8 @@
                     return;
                 }
 
-                // ▼▼▼ УСПЕХ — РЕДИРЕКТ ▼▼▼
                 showInfo('Код принят. Переходим к голосованию…');
-                window.location.href = data.redirect;
+                window.location.href = data.redirect || '/vote';
 
             } catch (err) {
                 console.error('Ошибка:', err);
@@ -712,12 +655,12 @@
         });
 
         // ═══════════════════════════════════════════════════════════
-        //  ФОКУС
+        //  ФОКУС ПРИ ЗАГРУЗКЕ
         // ═══════════════════════════════════════════════════════════
         window.addEventListener('load', () => {
             codeInput.focus();
+            console.log('CSRF:', CSRF ? '✓ есть' : '✗ нет');
         });
     </script>
-
 </body>
 </html>
