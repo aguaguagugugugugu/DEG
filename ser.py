@@ -2,7 +2,7 @@ from flask import Flask, send_from_directory, jsonify, request,render_template,r
 import uuid
 import hmac
 import os
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 import bcrypt
 import requests
 import threading
@@ -31,7 +31,7 @@ def get_ip():
     return request.remote_addr
 # ─── Хранилище в памяти (для теста; в проде — БД) ───
 _ip_cache = {}          # ip → (timestamp, info)
-_IP_TTL = 3600
+IP_TTL = timedelta(hours=1)
 candidates_store = []
 votes_store = []
 annulled_votes = set()
@@ -40,6 +40,7 @@ verifd  = set()                  # set вместо list
 seen_requests = set()
 # ─── Секретный токен для админ-операций ───
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
+ADMIN_PASSWORD = os.environ.get("ADMPASS")
 TURNSTILE_SECRET = os.environ.get("SECRET")
 print(repr(TURNSTILE_SECRET))
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
@@ -104,16 +105,9 @@ def get_country(ip: str) -> dict:
 
     # 1. Проверяем кеш
     cached = _ip_cache.get(ip)
-    if cached and now - cached[0] < _IP_TTL:
+    if cached and now - cached[0] < IP_TTL:
         return cached[1]        # ← вернули из памяти, не дёрнули API
 
-    # 2. Локальные IP — сразу дефолт, без запроса
-    if ip.startswith(('127.', '192.168.', '10.', '172.')):
-        info = {'countryCode': 'LOCAL', 'hosting': False, 'proxy': False}
-        _ip_cache[ip] = (now, info)
-        return info
-
-    # 3. Идём в API
     try:
         r = requests.get(
             f"http://ip-api.com/json/{ip}",
@@ -121,10 +115,10 @@ def get_country(ip: str) -> dict:
             timeout=3
         )
         data = r.json()
-        info = data if data.get('status') == 'success' else {}
+        info = data if data.get('status') == 'success' else {'countryCode': 'RU', 'hosting': False, 'proxy': False}
     except Exception:
         info = {}
-
+    print(info)
     # 4. Запоминаем на час
     _ip_cache[ip] = (now, info)
     return info
@@ -149,7 +143,7 @@ def check_csrf() -> bool:
 @app.route('/vote')
 def index():
     if session.get('hash') in verifd:
-      if get_country(get_ip()) == 'RU':
+      if get_country(get_ip())['countryCode'] == 'RU':
         return render_template('index.html',csrf=get_csrf_token())
       else:
         return redirect(url_for('block'))
@@ -203,9 +197,12 @@ def vote():
     data = request.get_json() or {}
     request_id   = data.get('request_id')
     candidate_id = data.get('candidate_id')
+
+    # ─── 1. CSRF ───
     if not check_csrf():
         return jsonify(error="Неверный CSRF-токен"), 403
-    # ─── 1. Валидация входа ───
+
+    # ─── 2. Валидация входа ───
     if not request_id or not candidate_id:
         return jsonify(error="request_id и candidate_id обязательны"), 400
 
@@ -213,31 +210,36 @@ def vote():
     if not h:
         return jsonify(error="Не верифицирован"), 403
 
-    # ─── 2. Вся логика голоса — под одним локом ───
+    # ─── 3. Вся логика — под одним локом ───
     with _lock:
-        if not get_country(get_ip()) == 'RU':
-            return jsonify(status="Russia only", request_id=request_id), 403
-        # 2.1. Идемпотентность: этот request_id уже голосовал?
+        # 3.1. Только из РФ
+        ip = get_ip()
+        if get_country(ip).get('countryCode') != 'RU':
+            return jsonify(error="Голосование доступно только из РФ"), 403
+
+        # 3.2. Идемпотентность по request_id
         if any(v['request_id'] == request_id for v in votes_store):
             return jsonify(status="duplicate", request_id=request_id), 409
 
-        # 2.2. Кандидат существует?
+        # 3.3. Право голоса ещё есть?
+        if h not in verifd:
+            return jsonify(error="Вы уже голосовали"), 409
+
+        # 3.4. Кандидат существует?
         candidate = next((c for c in candidates_store if c['id'] == candidate_id), None)
         if not candidate:
             return jsonify(error="candidate not found"), 404
-        ip = get_ip()
+
+        # 3.5. Атомарно съедаем право голоса
+        verifd.discard(h)
+
+        # 3.6. Считаем fraud score
         ua = request.headers.get('User-Agent', '')
         fp = data.get('fingerprint', '')
-        vote_id = str(uuid.uuid4())
-
-        # ip-api — вне lock, чтобы не блокировать
-        # (запрашиваем после записи, но score посчитаем сейчас)
-        # Для простоты — берём IP-инфо из кеша (см. ниже)
-
         ip_info = get_country(ip)
 
         vote_doc = {
-            "vote_id":      vote_id,
+            "vote_id":      str(uuid.uuid4()),
             "request_id":   request_id,
             "candidate_id": candidate_id,
             "code_hash":    h,
@@ -253,31 +255,19 @@ def vote():
         vote_doc['reasons']     = reasons
         vote_doc['suspicious']  = score >= 70
 
-        candidate['votes'] += 1
+        # 3.7. Записываем ОДИН раз
         votes_store.append(vote_doc)
-        # 2.3. Право голоса ещё есть?
-        if h not in verifd:
-            return jsonify(error="Вы уже голосовали"), 409
-
-        # 2.4. Атомарно съедаем право голоса
-        verifd.discard(h)
-
-        # 2.5. Записываем голос
         candidate['votes'] += 1
-        votes_store.append({
-            "request_id":   request_id,
-            "candidate_id": candidate_id,
-            "ts":           datetime.now(timezone.utc).isoformat(),
-            "ip":           request.remote_addr,
-        })
 
-    # ─── 3. Ротация сессии ───
+        vote_id = vote_doc['vote_id']
+
+    # ─── 4. Ротация сессии ───
     session.clear()
 
     return jsonify(
         status="accepted",
         request_id=request_id,
-        vote_id=str(uuid.uuid4()),
+        vote_id=vote_id,
     ), 201
 
 @limiter.limit("60 per minute")
@@ -356,7 +346,7 @@ def reset_votes():
 
 @app.route('/', methods=['POST','GET'])
 def vx ():
-    if get_country(get_ip()) == 'RU':
+    if get_country(get_ip())['countryCode'] == 'RU':
         return render_template('vxod.html',csrf=get_csrf_token())
     else:
         return redirect(url_for('block'))
@@ -403,20 +393,31 @@ def che ():
 def block():
   return render_template('block.html')
 
-# ─── Проверка админа ───
-def require_admin(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        token = request.headers.get('X-Admin-Token', '')
-        if not ADMIN_TOKEN or not hmac.compare_digest(token, ADMIN_TOKEN):
-            return jsonify(error="Forbidden"), 403
-        return f(*args, **kwargs)
-    return wrapper
+@app.route('/admin')
+def admin_page():
+    if not session.get('admin'):
+        return render_template('admin_login.html')
+    return render_template('admin.html')
 
+
+@app.route('/api/admin/login', methods=['POST'])
+@limiter.limit("5 per minute")
+def admin_login():
+    data = request.get_json() or {}
+    password = data.get('password', '')
+
+    if not password:
+        return jsonify(error="Введите пароль"), 400
+
+    if not bcrypt.checkpw(password.encode(), ADMIN_PASSWORD.encode()):
+        return jsonify(error="Неверный пароль"), 401
+
+    session['admin'] = True
+    session.permanent = True
+    return jsonify(success=True, redirect='/admin')
 
 # ─── Список голосов ───
 @app.route('/api/admin/votes', methods=['GET'])
-@require_admin
 def admin_votes():
     only_suspicious = request.args.get('suspicious') == '1'
     only_active     = request.args.get('active') == '1'
@@ -453,7 +454,7 @@ def admin_votes():
 
 # ─── Аннулировать один голос ───
 @app.route('/api/admin/votes/<vote_id>/invalidate', methods=['POST'])
-@require_admin
+
 def invalidate_vote(vote_id):
     with _lock:
         vote = next((v for v in votes_store if v['vote_id'] == vote_id), None)
@@ -473,7 +474,7 @@ def invalidate_vote(vote_id):
 
 # ─── Массово аннулировать подозрительные ───
 @app.route('/api/admin/votes/invalidate-suspicious', methods=['POST'])
-@require_admin
+
 def invalidate_all_suspicious():
     data = request.get_json() or {}
     min_score = int(data.get('min_score', 70))
@@ -495,7 +496,7 @@ def invalidate_all_suspicious():
 
 # ─── Статистика ───
 @app.route('/api/admin/stats', methods=['GET'])
-@require_admin
+
 def admin_stats():
     scores = [v.get('fraud_score', 0) for v in votes_store]
     return jsonify({
@@ -508,14 +509,7 @@ def admin_stats():
     })
 
 
-# ─── Страница админки ───
-@app.route('/admin')
-def admin_page():
-    # Простая защита — токен в URL
-    token = request.args.get('token', '')
-    if not ADMIN_TOKEN or not hmac.compare_digest(token, ADMIN_TOKEN):
-        return "Forbidden", 403
-    return render_template('admin.html')
+
 # ═══════════════════════════════════════════════════
 #  ЗАПУСК
 # ═══════════════════════════════════════════════════

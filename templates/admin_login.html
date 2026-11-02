@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в админ-панель</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'PT Sans', 'Segoe UI', Arial, sans-serif;
+            background: #f2f4f7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        }
+
+        .login-box__icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            background: #0d2c6b;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+
+        .login-box h1 {
+            font-size: 22px;
+            color: #0d2c6b;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .login-box p {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .field { margin-bottom: 18px; }
+
+        .field label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .field input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #c9d2e0;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 15px;
+            color: #1c1c1c;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .field input:focus {
+            outline: none;
+            border-color: #0d4cd3;
+            box-shadow: 0 0 0 3px rgba(13, 76, 211, 0.12);
+        }
+
+        .field input:disabled {
+            background: #f2f4f7;
+            cursor: not-allowed;
+        }
+
+        .error {
+            display: none;
+            padding: 10px 12px;
+            margin-bottom: 16px;
+            background: #fef3f2;
+            border-left: 3px solid #b42318;
+            color: #7a271a;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .error.show { display: block; }
+
+        .btn {
+            width: 100%;
+            padding: 13px;
+            background: #0d4cd3;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: background 0.15s;
+        }
+        .btn:hover:not(:disabled) { background: #0a3da8; }
+        .btn:disabled {
+            background: #c9d2e0;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+
+        .btn-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        .btn.loading .btn-spinner { display: inline-block; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #6b7280;
+            text-decoration: none;
+        }
+        .back-link:hover { color: #0d4cd3; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <div class="login-box__icon">⚙️</div>
+        <h1>Админ-панель</h1>
+        <p>Введите пароль для доступа</p>
+
+        <div class="error" id="errorMsg"></div>
+
+        <form id="loginForm" autocomplete="off">
+            <div class="field">
+                <label for="password">Пароль</label>
+                <input type="password"
+                       id="password"
+                       placeholder="••••••••••••"
+                       autocomplete="current-password"
+                       autofocus>
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn">
+                <span class="btn-spinner"></span>
+                <span>Войти</span>
+            </button>
+        </form>
+
+        <a href="/" class="back-link">← Вернуться на главную</a>
+    </div>
+
+    <script>
+        const form = document.getElementById('loginForm');
+        const passwordInput = document.getElementById('password');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMsg = document.getElementById('errorMsg');
+
+        function showError(text) {
+            errorMsg.textContent = text;
+            errorMsg.classList.add('show');
+        }
+
+        function hideError() {
+            errorMsg.classList.remove('show');
+        }
+
+        function setLoading(on) {
+            submitBtn.classList.toggle('loading', on);
+            submitBtn.disabled = on;
+            passwordInput.disabled = on;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+
+            const password = passwordInput.value;
+            if (!password) {
+                showError('Введите пароль');
+                passwordInput.focus();
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const r = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await r.json().catch(() => ({}));
+
+                if (!r.ok) {
+                    showError(data.error || 'Неверный пароль');
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                    setLoading(false);
+                    return;
+                }
+            window.location.href = data.redirect || '/admin';
+            } catch (err) {
+                showError('Сетевая ошибка: ' + err.message);
+                setLoading(false);
+            }
+        });
+
+        window.addEventListener('load', () => passwordInput.focus());
+    </script>
+</body>
+</html>

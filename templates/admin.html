@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель — Голоса</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'PT Sans', 'Segoe UI', Arial, sans-serif;
+            background: #f2f4f7;
+            color: #1c1c1c;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ─── ШАПКА ─── */
+        .top-bar {
+            background: #0d2c6b;
+            color: #fff;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-bar__title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .top-bar__title h1 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .btn-logout {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+        /* ─── КОНТЕНТ ─── */
+        .main {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* ─── СЕКЦИЯ ─── */
+        .section {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .section__header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e7eaee;
+            background: #fafbfc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .section__header h2 {
+            font-size: 16px;
+            color: #0d2c6b;
+            font-weight: 700;
+        }
+
+        .section__header .meta {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .section__body { padding: 20px; }
+
+        /* ─── РЕЗУЛЬТАТЫ ─── */
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .result-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 14px 16px;
+            border: 1px solid #e7eaee;
+            border-radius: 6px;
+            background: #fff;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .result-row:hover {
+            border-color: #c9d2e0;
+        }
+
+        .result-row.leading {
+            border-color: #128a3a;
+            background: #f0fdf4;
+        }
+
+        .result-row__head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .result-row__left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .result-row__place {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #eef0f3;
+            color: #4b5563;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .result-row.leading .result-row__place {
+            background: #128a3a;
+            color: #fff;
+        }
+
+        .result-row__name-wrap { min-width: 0; flex: 1; }
+
+        .result-row__name {
+            font-weight: 700;
+            font-size: 15px;
+            color: #1c1c1c;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .result-row__party {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .result-row__right {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .result-row__votes {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0d2c6b;
+            font-family: 'Courier New', monospace;
+            line-height: 1;
+        }
+
+        .result-row__percent {
+            font-size: 14px;
+            font-weight: 700;
+            color: #128a3a;
+            margin-top: 4px;
+        }
+
+        .result-row__bar {
+            height: 10px;
+            background: #eef0f3;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .result-row__bar > div {
+            height: 100%;
+            background: linear-gradient(90deg, #0d4cd3, #0a3da8);
+            border-radius: 5px;
+            transition: width 0.6s ease;
+        }
+
+        .result-row.leading .result-row__bar > div {
+            background: linear-gradient(90deg, #128a3a, #0f6d2e);
+        }
+
+        .result-row__suspicious {
+            font-size: 11px;
+            color: #b45309;
+            margin-top: 4px;
+        }
+
+        /* ─── СТАТИСТИКА ─── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+            padding: 18px;
+        }
+
+        .stat-card__label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .stat-card__value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0d2c6b;
+            font-family: 'Courier New', monospace;
+            line-height: 1;
+        }
+
+        .stat-card--warn .stat-card__value { color: #d97706; }
+        .stat-card--danger .stat-card__value { color: #b42318; }
+        .stat-card--success .stat-card__value { color: #128a3a; }
+
+        /* ─── ФИЛЬТРЫ ─── */
+        .filters {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filters label {
+            font-size: 13px;
+            color: #4b5563;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .filters label input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .filters input[type="number"] {
+            width: 70px;
+            padding: 6px 8px;
+            border: 1px solid #c9d2e0;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        .filters button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #0d4cd3;
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .filters button:hover { background: #0a3da8; }
+
+        .filters .btn-danger {
+            background: #b42318;
+        }
+        .filters .btn-danger:hover { background: #8a1a12; }
+
+        /* ─── ТАБЛИЦА ─── */
+        .table-wrap {
+            background: #fff;
+            border: 1px solid #dfe3e8;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid #e7eaee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fafbfc;
+        }
+
+        .table-header h2 {
+            font-size: 15px;
+            color: #0d2c6b;
+        }
+
+        .table-header .count {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead th {
+            padding: 10px 12px;
+            text-align: left;
+            background: #f7f9fc;
+            border-bottom: 1px solid #e7eaee;
+            font-weight: 700;
+            color: #374151;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eef0f3;
+            vertical-align: top;
+        }
+
+        tbody tr:hover td { background: #fafbff; }
+
+        tbody tr.suspicious td { background: #fffbeb; }
+        tbody tr.suspicious:hover td { background: #fef3c7; }
+
+        tbody tr.invalid td {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        /* ─── ЯЧЕЙКИ ─── */
+        .score-cell { min-width: 90px; }
+
+        .score {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 3px;
+            font-weight: 700;
+            font-size: 12px;
+            color: #fff;
+            min-width: 38px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        .score.low    { background: #128a3a; }
+        .score.med    { background: #d97706; }
+        .score.high   { background: #b42318; }
+
+        .reasons {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #78350f;
+            line-height: 1.4;
+        }
+        .reasons li {
+            list-style: none;
+            padding: 1px 0;
+        }
+        .reasons li::before { content: "⚠ "; }
+
+        .uuid {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #6b7280;
+            word-break: break-all;
+            max-width: 220px;
+        }
+
+        .ua {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #4b5563;
+            max-width: 280px;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .ip {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #1c1c1c;
+            white-space: nowrap;
+        }
+
+        .date {
+            font-size: 12px;
+            color: #4b5563;
+            white-space: nowrap;
+        }
+        .date small {
+            display: block;
+            color: #9099a8;
+            font-size: 11px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .status-badge.active {
+            background: #ecfdf3;
+            color: #0f5132;
+        }
+        .status-badge.invalid {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .btn-invalidate {
+            padding: 6px 12px;
+            border: 1px solid #f3c0bc;
+            background: #fff;
+            color: #b42318;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .btn-invalidate:hover:not(:disabled) { background: #fef3f2; }
+        .btn-invalidate:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9099a8;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .main { padding: 16px; }
+            .top-bar { padding: 0 16px; height: 54px; }
+            .top-bar__title h1 { font-size: 15px; }
+            .filters { padding: 12px 16px; gap: 10px; }
+            .filters button { font-size: 12px; padding: 6px 12px; }
+            .result-row__votes { font-size: 17px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ═══ ШАПКА ═══ -->
+    <div class="top-bar">
+        <div class="top-bar__title">
+            <span>⚙️</span>
+            <h1>Админ-панель — Голоса</h1>
+        </div>
+        <div class="top-bar__actions">
+            <button class="btn-logout" id="logoutBtn">Выйти</button>
+        </div>
+    </div>
+
+    <div class="main">
+
+        <!-- ═══ СТАТИСТИКА ═══ -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-card__label">Всего голосов</div>
+                <div class="stat-card__value" id="statTotal">—</div>
+            </div>
+            <div class="stat-card stat-card--success">
+                <div class="stat-card__label">Активных</div>
+                <div class="stat-card__value" id="statActive">—</div>
+            </div>
+            <div class="stat-card stat-card--danger">
+                <div class="stat-card__label">Аннулировано</div>
+                <div class="stat-card__value" id="statInvalid">—</div>
+            </div>
+            <div class="stat-card stat-card--warn">
+                <div class="stat-card__label">Подозрительных</div>
+                <div class="stat-card__value" id="statSuspicious">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card__label">Средний score</div>
+                <div class="stat-card__value" id="statAvg">—</div>
+            </div>
+        </div>
+
+        <!-- ═══ РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ ═══ -->
+        <div class="section">
+            <div class="section__header">
+                <h2>📊 Итоги голосования</h2>
+                <span class="meta" id="resultsMeta">—</span>
+            </div>
+            <div class="section__body">
+                <div class="results-list" id="resultsList">
+                    <div class="empty">Загрузка результатов…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ ФИЛЬТРЫ ═══ -->
+        <div class="filters">
+            <label>
+                <input type="checkbox" id="fSuspicious">
+                Только подозрительные
+            </label>
+            <label>
+                <input type="checkbox" id="fActive" checked>
+                Только активные
+            </label>
+            <label>
+                Score ≥
+                <input type="number" id="fMinScore" value="0" min="0" max="100">
+            </label>
+            <button id="applyFiltersBtn">Применить</button>
+            <button class="btn-danger" id="invalidateSuspiciousBtn">
+                Аннулировать все подозрительные (≥70)
+            </button>
+        </div>
+
+        <!-- ═══ ТАБЛИЦА ═══ -->
+        <div class="table-wrap">
+            <div class="table-header">
+                <h2>Список голосов</h2>
+                <span class="count" id="tableCount">—</span>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Score</th>
+                            <th>Время (UTC)</th>
+                            <th>IP</th>
+                            <th>User-Agent</th>
+                            <th>UUID голоса</th>
+                            <th>Статус</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="votesBody">
+                        <tr>
+                            <td colspan="7" class="empty">Загрузка…</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════
+        //  API
+        // ═══════════════════════════════════════════════════════════
+        const api = {
+            candidates: '/api/candidates',
+            votes:      '/api/admin/votes',
+            stats:      '/api/admin/stats',
+            invalidate: (id) => `/api/admin/votes/${id}/invalidate`,
+            invalidateSuspicious: '/api/admin/votes/invalidate-suspicious',
+            logout:     '/api/admin/logout',
+        };
+
+        async function apiFetch(url, options = {}) {
+            return fetch(url, {
+                ...options,
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {})
+                }
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  СТАТИСТИКА
+        // ═══════════════════════════════════════════════════════════
+        async function loadStats() {
+            try {
+                const r = await apiFetch(api.stats);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const s = await r.json();
+
+                document.getElementById('statTotal').textContent      = s.votes_total ?? 0;
+                document.getElementById('statActive').textContent     = s.votes_active ?? 0;
+                document.getElementById('statInvalid').textContent    = s.votes_invalid ?? 0;
+                document.getElementById('statSuspicious').textContent = s.suspicious ?? 0;
+                document.getElementById('statAvg').textContent        = s.avg_score ?? 0;
+            } catch (e) {
+                console.error('Ошибка загрузки статистики:', e);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ИТОГИ ГОЛОСОВАНИЯ
+        // ═══════════════════════════════════════════════════════════
+        async function loadResults() {
+            const list = document.getElementById('resultsList');
+            const meta = document.getElementById('resultsMeta');
+
+            try {
+                const [candRes, votesRes] = await Promise.all([
+                    apiFetch(api.candidates),
+                    apiFetch(api.votes + '?limit=2000')
+                ]);
+
+                if (!candRes.ok) throw new Error('Не удалось загрузить кандидатов');
+                const candidates = await candRes.json();
+
+                // Все голоса (для подсчёта активных по кандидатам)
+                const votesData = votesRes.ok ? await votesRes.json() : { votes: [] };
+                const allVotes = votesData.votes || [];
+
+                // Считаем активные голоса по каждому кандидату
+                const activeByCandidate = {};
+                for (const v of allVotes) {
+                    if (v.invalid) continue;
+                    activeByCandidate[v.candidate_id] = (activeByCandidate[v.candidate_id] || 0) + 1;
+                }
+
+                // Итоговые голоса (из candidates_store, там votes уже за вычетом аннулированных)
+                const rows = candidates.map(c => ({
+                    id: c.id,
+                    name: c.name || 'Без имени',
+                    party: c.party || 'Самовыдвиженец',
+                    votes: c.votes || 0,
+                    suspicious: c.votes_suspicious || 0,
+                }));
+
+                rows.sort((a, b) => b.votes - a.votes);
+
+                const totalVotes = rows.reduce((s, r) => s + r.votes, 0);
+                const maxVotes = rows.length && rows[0].votes > 0 ? rows[0].votes : 1;
+
+                meta.textContent = `Всего голосов: ${totalVotes} · кандидатов: ${rows.length}`;
+
+                if (rows.length === 0) {
+                    list.innerHTML = '<div class="empty">Кандидатов пока нет</div>';
+                    return;
+                }
+
+                list.innerHTML = '';
+                rows.forEach((row, idx) => {
+                    const isLeading = idx === 0 && row.votes > 0;
+                    const percent = totalVotes > 0
+                        ? (row.votes / totalVotes * 100).toFixed(1)
+                        : '0.0';
+                    const barWidth = Math.round((row.votes / maxVotes) * 100);
+
+                    const el = document.createElement('div');
+                    el.className = 'result-row' + (isLeading ? ' leading' : '');
+                    el.innerHTML = `
+                        <div class="result-row__head">
+                            <div class="result-row__left">
+                                <div class="result-row__place">${idx + 1}</div>
+                                <div class="result-row__name-wrap">
+                                    <div class="result-row__name">${escapeHtml(row.name)}</div>
+                                    <div class="result-row__party">${escapeHtml(row.party)}</div>
+                                </div>
+                            </div>
+                            <div class="result-row__right">
+                                <div class="result-row__votes">${row.votes}</div>
+                                <div class="result-row__percent">${percent}%</div>
+                            </div>
+                        </div>
+                        <div class="result-row__bar">
+                            <div style="width:${barWidth}%"></div>
+                        </div>
+                        ${row.suspicious > 0
+                            ? `<div class="result-row__suspicious">Из них подозрительных: ${row.suspicious}</div>`
+                            : ''}
+                    `;
+                    list.appendChild(el);
+                });
+
+            } catch (e) {
+                list.innerHTML = `<div class="empty" style="color:#b42318;">Ошибка: ${escapeHtml(e.message)}</div>`;
+                meta.textContent = '—';
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  СПИСОК ГОЛОСОВ
+        // ═══════════════════════════════════════════════════════════
+        async function loadVotes() {
+            const params = new URLSearchParams();
+            if (document.getElementById('fSuspicious').checked) params.set('suspicious', '1');
+            if (document.getElementById('fActive').checked)     params.set('active', '1');
+            const minScore = parseInt(document.getElementById('fMinScore').value) || 0;
+            if (minScore > 0) params.set('min_score', minScore);
+
+            const tbody = document.getElementById('votesBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">Загрузка…</td></tr>';
+
+            try {
+                const r = await apiFetch(api.votes + '?' + params.toString());
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+                const data = await r.json();
+
+                document.getElementById('tableCount').textContent =
+                    `Показано ${data.returned} из ${data.total}`;
+
+                if (!data.votes || data.votes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty">Нет голосов</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                data.votes.forEach(v => {
+                    tbody.appendChild(buildRow(v));
+                });
+
+                tbody.querySelectorAll('.btn-invalidate').forEach(btn => {
+                    btn.addEventListener('click', () => invalidateVote(btn.dataset.voteId));
+                });
+
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="7" class="empty" style="color:#b42318;">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ПОСТРОЕНИЕ СТРОКИ
+        // ═══════════════════════════════════════════════════════════
+        function buildRow(v) {
+            const score = v.fraud_score || 0;
+            const scoreClass = score >= 70 ? 'high' : score >= 30 ? 'med' : 'low';
+            const reasons = (v.reasons || []).map(r => `<li>${escapeHtml(r)}</li>`).join('');
+
+            const tr = document.createElement('tr');
+            if (v.invalid) tr.classList.add('invalid');
+            if (v.suspicious) tr.classList.add('suspicious');
+
+            tr.innerHTML = `
+                <td class="score-cell">
+                    <span class="score ${scoreClass}">${score}</span>
+                    ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}
+                </td>
+                <td class="date">${formatDate(v.ts)}</td>
+                <td class="ip">${escapeHtml(v.ip || '—')}</td>
+                <td class="ua">${escapeHtml(v.user_agent || '—')}</td>
+                <td class="uuid">${escapeHtml(v.vote_id)}</td>
+                <td>
+                    ${v.invalid
+                        ? '<span class="status-badge invalid">Аннулирован</span>'
+                        : '<span class="status-badge active">Активен</span>'}
+                </td>
+                <td>
+                    <button class="btn-invalidate"
+                            data-vote-id="${escapeHtml(v.vote_id)}"
+                            ${v.invalid ? 'disabled' : ''}>
+                        Аннулировать
+                    </button>
+                </td>
+            `;
+            return tr;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  АННУЛИРОВАНИЕ
+        // ═══════════════════════════════════════════════════════════
+        async function invalidateVote(voteId) {
+            if (!confirm('Аннулировать этот голос?')) return;
+
+            try {
+                const r = await apiFetch(api.invalidate(voteId), { method: 'POST' });
+                const data = await r.json().catch(() => ({}));
+
+                if (!r.ok) {
+                    alert(data.error || 'Не удалось аннулировать');
+                    return;
+                }
+
+                // После аннулирования обновляем всё — и голоса, и результаты
+                await Promise.all([loadVotes(), loadStats(), loadResults()]);
+            } catch (e) {
+                alert('Сетевая ошибка: ' + e.message);
+            }
+        }
+
+        document.getElementById('invalidateSuspiciousBtn').addEventListener('click', async () => {
+            if (!confirm('Аннулировать ВСЕ голоса с score ≥ 70?')) return;
+
+            try {
+                const r = await apiFetch(api.invalidateSuspicious, {
+                    method: 'POST',
+                    body: JSON.stringify({ min_score: 70 })
+                });
+                const data = await r.json();
+
+                if (!r.ok) {
+                    alert(data.error || 'Ошибка');
+                    return;
+                }
+
+                alert(`Аннулировано: ${data.invalidated}`);
+                await Promise.all([loadVotes(), loadStats(), loadResults()]);
+            } catch (e) {
+                alert('Сетевая ошибка: ' + e.message);
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        //  ВЫХОД
+        // ═══════════════════════════════════════════════════════════
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await apiFetch(api.logout, { method: 'POST' });
+            } catch (e) {}
+            window.location.href = '/admin';
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        //  ХЕЛПЕРЫ
+        // ═══════════════════════════════════════════════════════════
+        function escapeHtml(s) {
+            return String(s ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '—';
+            try {
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) return iso;
+
+                const date = d.toLocaleDateString('ru-RU', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    timeZone: 'UTC'
+                });
+                const time = d.toLocaleTimeString('ru-RU', {
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    timeZone: 'UTC'
+                });
+
+                return `${date}<small>${time}</small>`;
+            } catch {
+                return iso;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ФИЛЬТРЫ
+        // ═══════════════════════════════════════════════════════════
+        document.getElementById('applyFiltersBtn').addEventListener('click', loadVotes);
+
+        document.getElementById('fMinScore').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') loadVotes();
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        //  АВТООБНОВЛЕНИЕ СТАТИСТИКИ (30 сек)
+        // ═══════════════════════════════════════════════════════════
+        setInterval(() => {
+            loadStats();
+            loadResults();
+        }, 30000);
+
+        // ═══════════════════════════════════════════════════════════
+        //  ИНИЦИАЛИЗАЦИЯ
+        // ═══════════════════════════════════════════════════════════
+        loadStats();
+        loadResults();
+        loadVotes();
+    </script>
+
+</body>
+</html>
